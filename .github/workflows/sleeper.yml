@@ -1,1 +1,47 @@
+name: sleeper-relay
+
+# Holt die Rohdaten der beiden Sleeper-Ligen und legt sie unter data/ ab.
+# Zweimal taeglich: einmal vor den Dienstags-/Donnerstagslaeufen der App (04:40 UTC)
+# und einmal am Abend (16:40 UTC). Die beiden Laeufe klammern die Waiver-Ausfuehrung
+# am Mittwochmorgen ein, damit die Bewegungen sauber zugeordnet werden koennen.
+# Zeiten sind UTC. "Manuell ausloesen" geht jederzeit ueber den Reiter Actions.
+
+on:
+  schedule:
+    - cron: "40 4 * * *"
+    - cron: "40 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sleeper-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Daten holen
+        run: python3 scripts/sleeper_relay.py
+
+      - name: Aenderungen committen
+        run: |
+          git config user.name "sleeper-relay"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then
+            echo "Keine Aenderungen."
+          else
+            git commit -m "sleeper-relay $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi
 
