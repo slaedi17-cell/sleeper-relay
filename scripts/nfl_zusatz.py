@@ -95,7 +95,7 @@ def spielplan(week):
     d = hole_json(url)
     if not d:
         return None
-    spiele, teams = [], {}
+    spiele, teams, proteam = [], {}, {}
     for ev in d.get("events") or []:
         iso = (ev.get("date") or "").replace("Z", "+00:00")
         try:
@@ -105,10 +105,12 @@ def spielplan(week):
         e, c = utc.astimezone(ET), utc.astimezone(CH)
         s = slot_von(e)
         comp = (ev.get("competitions") or [{}])[0]
-        krz = []
+        krz, krz_ids = [], []
         for t in comp.get("competitors") or []:
-            ab = ((t.get("team") or {}).get("abbreviation") or "").upper()
+            tm = t.get("team") or {}
+            ab = (tm.get("abbreviation") or "").upper()
             krz.append((ab, t.get("homeAway")))
+            krz_ids.append((ab, str(tm.get("id") or "")))
         heim = next((a for a, ha in krz if ha == "home"), None)
         gast = next((a for a, ha in krz if ha == "away"), None)
         eintrag = {
@@ -121,15 +123,17 @@ def spielplan(week):
             "status": ((comp.get("status") or {}).get("type") or {}).get("state"),
         }
         spiele.append(eintrag)
-        for ab in (heim, gast):
+        for ab, espn_id in krz_ids:
             if ab:
                 teams[ab] = {"slot": s, "slot_text": LABEL[s], "kickoff_ch": eintrag["kickoff_ch"],
                              "wochentag_ch": eintrag["wochentag_ch"], "gegner": gast if ab == heim else heim,
-                             "heim": ab == heim}
+                             "heim": ab == heim, "espn_id": espn_id}
+                if espn_id:
+                    proteam[str(espn_id)] = ab
     spiele.sort(key=lambda x: x["kickoff_utc"])
     byes = sorted({t for t in ALLE_TEAMS} - set(teams)) if ALLE_TEAMS else []
     return {"season": SAISON, "week": week, "abgerufen": jetzt(),
-            "spiele": spiele, "teams": teams, "bye": byes}
+            "spiele": spiele, "teams": teams, "bye": byes, "proteam": proteam}
  
  
 ALLE_TEAMS = {"ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB",
@@ -192,3 +196,4 @@ def main():
  
 if __name__ == "__main__":
     main()
+ 
