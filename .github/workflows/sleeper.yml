@@ -32,8 +32,8 @@ jobs:
 
       - name: Daten holen
         run: python3 scripts/sleeper_relay.py
-        
-        name: Spielplan und Verletzungen holen
+
+      - name: Spielplan und Verletzungen holen
         run: python3 scripts/nfl_zusatz.py
 
       - name: Aenderungen committen
@@ -47,4 +47,3 @@ jobs:
             git commit -m "sleeper-relay $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             git push
           fi
-
