@@ -32,6 +32,9 @@ jobs:
 
       - name: Daten holen
         run: python3 scripts/sleeper_relay.py
+        
+        name: Spielplan und Verletzungen holen
+        run: python3 scripts/nfl_zusatz.py
 
       - name: Aenderungen committen
         run: |
