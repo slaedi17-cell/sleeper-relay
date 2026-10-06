@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Zusatzdaten für das Sleeper-Relay: NFL-Spielplan und Verletzungsliste.
- 
+
 Warum diese Datei:
   * SPIELPLAN — die wöchentlichen Berichte sollen konstant über die Spielzeitpunkte
     reden (TNF, Sonntag früh/spät, SNF, MNF). Dafür braucht jeder Lauf pro NFL-Team
@@ -10,7 +10,7 @@ Warum diese Datei:
   * VERLETZUNGEN — bisher musste jeder Lauf per Websuche raten, ob ein Ausfall eine
     Verletzung war. Sleeper liefert den Status selbst mit. Ergebnis: data/injuries.json
     (nur Spieler mit gesetztem injury_status, also klein).
- 
+
 Läuft mit der Standardbibliothek, im selben Stil wie sleeper_relay.py, und bricht den
 Workflow nie ab: Was nicht kommt, wird in data/nfl/status.json vermerkt.
 """
@@ -20,15 +20,15 @@ import os
 import urllib.error
 import urllib.request
 from zoneinfo import ZoneInfo
- 
+
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 ET = ZoneInfo("America/New_York")
 CH = ZoneInfo("Europe/Zurich")
 SAISON = int(os.environ.get("NFL_SAISON", "2026"))
 UA = {"User-Agent": "sleeper-relay/1.0 (+github actions)"}
 fehler = []
- 
- 
+
+
 def hole(url, versuche=3):
     for i in range(versuche):
         try:
@@ -41,8 +41,8 @@ def hole(url, versuche=3):
                 return None
             import time
             time.sleep(2 + 3 * i)
- 
- 
+
+
 def hole_json(url):
     b = hole(url)
     if b is None:
@@ -52,8 +52,8 @@ def hole_json(url):
     except ValueError as e:
         fehler.append("%s -> kein JSON (%s)" % (url, e))
         return None
- 
- 
+
+
 def schreibe(pfad, obj):
     p = os.path.join(DATA, pfad)
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -62,8 +62,8 @@ def schreibe(pfad, obj):
         json.dump(obj, f, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     os.replace(tmp, p)
     return p
- 
- 
+
+
 def slot_von(kick_et):
     """Slot-Kürzel aus der Kickoff-Zeit in US-Ostzeit."""
     wd, h = kick_et.weekday(), kick_et.hour          # Mo=0 … So=6
@@ -82,13 +82,13 @@ def slot_von(kick_et):
     if wd == 0:
         return "MNF"
     return "TUE"
- 
- 
+
+
 LABEL = {"TNF": "Thursday Night", "FRI": "Freitagsspiel", "SAT": "Samstagsspiel",
          "SUN_EARLY": "Sonntag früh", "SUN_LATE": "Sonntag spät",
          "SNF": "Sunday Night", "MNF": "Monday Night", "TUE": "Dienstagsspiel"}
- 
- 
+
+
 def spielplan(week):
     url = ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
            "?week=%d&seasontype=2&year=%d" % (week, SAISON))
@@ -134,25 +134,25 @@ def spielplan(week):
     byes = sorted({t for t in ALLE_TEAMS} - set(teams)) if ALLE_TEAMS else []
     return {"season": SAISON, "week": week, "abgerufen": jetzt(),
             "spiele": spiele, "teams": teams, "bye": byes, "proteam": proteam}
- 
- 
+
+
 ALLE_TEAMS = {"ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB",
               "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG",
               "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WSH"}
- 
- 
+
+
 def jetzt():
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
- 
- 
+
+
 def aktuelle_woche():
     d = hole_json("https://api.sleeper.app/v1/state/nfl") or {}
     try:
         return max(1, int(d.get("week") or 1))
     except (TypeError, ValueError):
         return 1
- 
- 
+
+
 def verletzungen():
     """Nur Spieler mit gesetztem injury_status — aus der grossen Spielerdatei."""
     d = hole_json("https://api.sleeper.app/v1/players/nfl")
@@ -171,12 +171,19 @@ def verletzungen():
             "news_updated": p.get("news_updated"),
         }
     return {"stand": jetzt(), "anzahl": len(out), "spieler": out}
- 
- 
+
+
 def main():
     w = aktuelle_woche()
-    wochen, geschrieben = [max(1, w - 1), w, min(18, w + 1)], []
-    for n in sorted(set(wochen)):
+    # Alle bisherigen Wochen plus die kommende. Abgeschlossene Wochen werden nur
+    # einmal geschrieben (ihre Kickoff-Zeiten aendern sich nicht mehr) — das haelt
+    # den Commit klein und spart ESPN-Abrufe. Die laufende und die kommende Woche
+    # werden bei jedem Lauf frisch geholt.
+    geschrieben = []
+    for n in range(1, min(18, w + 1) + 1):
+        pfad = os.path.join(DATA, "nfl/schedule_w%02d.json" % n)
+        if n < w - 1 and os.path.exists(pfad):
+            continue
         sp = spielplan(n)
         if sp:
             schreibe("nfl/schedule_w%02d.json" % n, sp)
@@ -192,8 +199,8 @@ def main():
         print("Fehler (Workflow laeuft trotzdem weiter):")
         for f in fehler:
             print("  -", f)
- 
- 
+
+
 if __name__ == "__main__":
     main()
- 
+
