@@ -1,51 +1,32 @@
 name: sleeper-relay
-
-# Holt die Rohdaten der beiden Sleeper-Ligen und legt sie unter data/ ab.
-# Zweimal taeglich: einmal frueh (04:40 UTC) und einmal am Abend (16:40 UTC).
-# Die beiden Laeufe klammern die Waiver-Ausfuehrung am Mittwochmorgen ein.
-#
-# Dazu ein eigener Lauf am DIENSTAG um 06:55 Schweizer Zeit, damit die
-# Montagabend-Spiele (MNF endet gegen 02:30) sicher fertig gewertet sind, bevor
-# der Wochenbericht um 07:00 startet. GitHub kennt nur UTC: In der Sommerzeit
-# ist 06:55 Schweizer Zeit = 04:55 UTC, in der Winterzeit = 05:55 UTC. Darum
-# stehen beide Zeilen da — es laeuft also einmal um 06:55 und einmal um 07:55
-# Ortszeit. Der zweite Lauf schadet nicht (er schreibt nur, was sich geaendert
-# hat) und erspart die Umstellung zweimal im Jahr.
-#
-# Zeiten sind UTC. "Manuell ausloesen" geht jederzeit ueber den Reiter Actions.
-
 on:
   schedule:
+    # UTC pair: one refresh at 06:25 Swiss time in summer and winter.
+    - cron: "25 4 * * 2,4"
+    - cron: "25 5 * * 2,4"
     - cron: "40 4 * * *"
     - cron: "40 16 * * *"
     - cron: "55 4 * * 2"
     - cron: "55 5 * * 2"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 concurrency:
   group: sleeper-relay
   cancel-in-progress: false
-
 jobs:
   relay:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Daten holen
         run: python3 scripts/sleeper_relay.py
-
       - name: Spielplan und Verletzungen holen
         run: python3 scripts/nfl_zusatz.py
-
       - name: Aenderungen committen
         run: |
           git config user.name "sleeper-relay"
